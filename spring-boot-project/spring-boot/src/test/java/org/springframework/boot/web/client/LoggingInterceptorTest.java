@@ -19,6 +19,7 @@ package org.springframework.boot.web.client;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 
 import org.apache.commons.logging.Log;
 import org.junit.Before;
@@ -28,6 +29,7 @@ import org.mockito.MockitoAnnotations;
 
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.client.ClientHttpRequestExecution;
 import org.springframework.mock.http.client.MockClientHttpRequest;
 import org.springframework.mock.http.client.MockClientHttpResponse;
@@ -60,27 +62,55 @@ public class LoggingInterceptorTest {
 	}
 
 	@Test
-	public void canLogRequest() throws IOException, URISyntaxException {
+	public void canLogRequestUsingDefaultCharset() throws IOException, URISyntaxException {
 		MockClientHttpRequest request = new MockClientHttpRequest(HttpMethod.POST,
 				new URI("/hello"));
-		byte[] body = "world".getBytes();
+		byte[] body = "world £".getBytes(StandardCharsets.ISO_8859_1);
 		given(this.execution.execute(request, body))
 				.willReturn(new MockClientHttpResponse(new byte[0], HttpStatus.OK));
 
 		this.loggingInterceptor.intercept(request, body, this.execution);
 
-		verify(this.log).debug("Request: POST /hello world");
+		verify(this.log).debug("Request: POST /hello world £");
 	}
 
 	@Test
-	public void canLogResponse() throws IOException, URISyntaxException {
-		MockClientHttpRequest request = new MockClientHttpRequest();
-		byte[] body = new byte[0];
+	public void canLogRequestUsingCharset() throws IOException, URISyntaxException {
+		MockClientHttpRequest request = new MockClientHttpRequest(HttpMethod.POST,
+				new URI("/hello"));
+		request.getHeaders().setContentType(MediaType.parseMediaType("text/plain;charset=UTF-8"));
+		byte[] body = "world £".getBytes(StandardCharsets.UTF_8);
 		given(this.execution.execute(request, body))
-				.willReturn(new MockClientHttpResponse("hello".getBytes(), HttpStatus.OK));
+				.willReturn(new MockClientHttpResponse(new byte[0], HttpStatus.OK));
 
 		this.loggingInterceptor.intercept(request, body, this.execution);
 
-		verify(this.log).debug("Response: 200 hello");
+		verify(this.log).debug("Request: POST /hello world £");
+	}
+
+	@Test
+	public void canLogResponseUsingDefaultCharset() throws IOException, URISyntaxException {
+		MockClientHttpRequest request = new MockClientHttpRequest();
+		byte[] body = "hello £".getBytes(StandardCharsets.ISO_8859_1);
+		given(this.execution.execute(request, new byte[0]))
+				.willReturn(new MockClientHttpResponse(body, HttpStatus.OK));
+
+		this.loggingInterceptor.intercept(request, new byte[0], this.execution);
+
+		verify(this.log).debug("Response: 200 hello £");
+	}
+
+	@Test
+	public void canLogResponseUsingCharset() throws IOException, URISyntaxException {
+		MockClientHttpRequest request = new MockClientHttpRequest();
+		byte[] body = "hello £".getBytes(StandardCharsets.UTF_8);
+		MockClientHttpResponse response = new MockClientHttpResponse(body, HttpStatus.OK);
+		response.getHeaders().setContentType(MediaType.parseMediaType("text/plain;charset=UTF-8"));
+		given(this.execution.execute(request, new byte[0]))
+				.willReturn(response);
+
+		this.loggingInterceptor.intercept(request, new byte[0], this.execution);
+
+		verify(this.log).debug("Response: 200 hello £");
 	}
 }

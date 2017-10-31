@@ -17,11 +17,14 @@
 package org.springframework.boot.web.client;
 
 import java.io.IOException;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 
 import org.apache.commons.logging.Log;
 
+import org.springframework.http.HttpMessage;
 import org.springframework.http.HttpRequest;
+import org.springframework.http.MediaType;
 import org.springframework.http.client.ClientHttpRequestExecution;
 import org.springframework.http.client.ClientHttpRequestInterceptor;
 import org.springframework.http.client.ClientHttpResponse;
@@ -35,6 +38,8 @@ import org.springframework.util.StreamUtils;
  */
 public class LoggingInterceptor implements ClientHttpRequestInterceptor {
 
+	private static final Charset DEFAULT_CHARSET = StandardCharsets.ISO_8859_1;
+
 	private final Log log;
 
 	public LoggingInterceptor(Log log) {
@@ -46,16 +51,26 @@ public class LoggingInterceptor implements ClientHttpRequestInterceptor {
 			ClientHttpRequestExecution execution) throws IOException {
 		if (this.log.isDebugEnabled()) {
 			this.log.debug(String.format("Request: %s %s %s", request.getMethod(),
-					request.getURI(), new String(body, StandardCharsets.UTF_8)));
+					request.getURI(), new String(body, getCharset(request))));
 		}
 
 		ClientHttpResponse response = execution.execute(request, body);
 
 		if (this.log.isDebugEnabled()) {
 			this.log.debug(String.format("Response: %s %s", response.getStatusCode().value(),
-					StreamUtils.copyToString(response.getBody(), StandardCharsets.UTF_8)));
+					StreamUtils.copyToString(response.getBody(), getCharset(response))));
 		}
 
 		return response;
+	}
+
+	private static Charset getCharset(HttpMessage message) {
+		MediaType contentType = message.getHeaders().getContentType();
+
+		if (contentType == null || contentType.getCharset() == null) {
+			return DEFAULT_CHARSET;
+		}
+
+		return contentType.getCharset();
 	}
 }
